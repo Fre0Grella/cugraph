@@ -442,6 +442,7 @@ set(CUGRAPH_SOURCES
     src/traversal/od_shortest_distances_sg_v64_e64.cu
     src/traversal/od_shortest_distances_sg_v32_e32.cu
     src/traversal/od_shortest_distances_sg_v32_e64.cu
+    src/traversal/floyd_warshall_sg.cu
     src/traversal/sssp_mg_v64_e64.cu
     src/traversal/sssp_mg_v32_e32.cu
     src/traversal/sssp_mg_v32_e64.cu
