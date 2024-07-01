@@ -32,6 +32,79 @@
 
 namespace cugraph {
 namespace detail {
+  template <typename vertex_t,
+          typename edge_t,
+          typename weight_t,
+          bool multi_gpu,
+          typename VertexIterator>
+rmm::device_uvector<weight_t> closeness_centrality(
+  raft::handle_t const& handle,
+  graph_view_t<vertex_t, edge_t, false, multi_gpu> const& graph_view,
+  std::optional<edge_property_view_t<edge_t, weight_t const*>> edge_weight_view,
+  VertexIterator vertices_begin,
+  VertexIterator vertices_end,
+  bool const normalized,
+  bool const is_directed_graph,
+  bool const do_expensive_check)
+  {
+    //
+    //  Closeness Centrality algorithm based on Katz and Kider version of paralell Floyd-Warshall (2008)  
+    //
+    if (do_expensive_check) { //Check graph integrity
+      auto vertex_partition =
+        vertex_partition_device_view_t<vertex_t, multi_gpu>(graph_view.local_vertex_partition_view());
+      auto num_invalid_vertices =
+        thrust::count_if(handle.get_thrust_policy(),
+                         vertices_begin,
+                         vertices_end,
+                         [vertex_partition] __device__(auto val) {
+                           return !(vertex_partition.is_valid_vertex(val) &&
+                                    vertex_partition.in_local_vertex_partition_range_nocheck(val));
+                         });
+      if constexpr (multi_gpu) {
+        num_invalid_vertices = host_scalar_allreduce(
+          handle.get_comms(), num_invalid_vertices, raft::comms::op_t::SUM, handle.get_stream());
+      }
+      CUGRAPH_EXPECTS(num_invalid_vertices == 0,
+                    "Invalid input argument: sources have invalid vertex IDs.");
+    }
+  
+  //Allocate centralities weights and number of vertices
+  rmm::device_uvector<weight_t> centralities(graph_view.local_vertex_partition_range_size(),
+                                             handle.get_stream());
+  size_t num_sources = thrust::distance(vertices_begin, vertices_end);
+
+  //TODO: add the core part
+  
+  
+  std::optional<weight_t> scale_factor{std::nullopt};
+  if (normalized) {
+    weight_t n = static_cast<weight_t>(graph_view.number_of_vertices());
+    if (!is_directed_graph) { n -= weight_t{1}; }
+
+    scale_factor = n * (n - 1);
+  } else if (graph_view.is_symmetric())
+    scale_factor = weight_t{2};
+
+  if (scale_factor) {
+    if (graph_view.number_of_vertices() > 2) {
+      if (static_cast<vertex_t>(num_sources) < graph_view.number_of_vertices()) {
+        (*scale_factor) *= static_cast<weight_t>(num_sources) /
+                           static_cast<weight_t>(graph_view.number_of_vertices());
+      }
+
+      thrust::transform(
+        handle.get_thrust_policy(),
+        centralities.begin(),
+        centralities.end(),
+        centralities.begin(),
+        [sf = *scale_factor] __device__(auto centrality) { return centrality / sf; });
+    }
+  }
+
+  return centralities;
+  }
+  
 } // end namespace detail
 
 template <typename vertex_t, typename edge_t, typename weight_t, bool multi_gpu>
@@ -44,26 +117,29 @@ rmm::device_uvector<weight_t> closeness_centrality(
   bool const is_directed_graph,
   bool const do_expensive_check)
 {
-{
+  if constexpr (multi_gpu) {
+    CUGRAPH_EXPECTS(multi_gpu,"Invalid input argument: multi-gpu closeness centrality is not yet implemented");
+  }
+
   if (vertices) {
-    return detail::betweenness_centrality(handle,
+    return detail::closeness_centrality(handle,
                                           graph_view,
                                           edge_weight_view,
                                           vertices->begin(),
                                           vertices->end(),
                                           normalized,
-                                          include_endpoints,
+                                          is_directed_graph,
                                           do_expensive_check);
   } else {
-    return detail::betweenness_centrality(
-      handle,
-      graph_view,
-      edge_weight_view,
-      thrust::make_counting_iterator(graph_view.local_vertex_partition_range_first()),
-      thrust::make_counting_iterator(graph_view.local_vertex_partition_range_last()),
-      normalized,
-      include_endpoints,
-      do_expensive_check);
+    return detail::closeness_centrality(
+                                        handle,
+                                        graph_view,
+                                        edge_weight_view,
+                                        thrust::make_counting_iterator(graph_view.local_vertex_partition_range_first()),
+                                        thrust::make_counting_iterator(graph_view.local_vertex_partition_range_last()),
+                                        normalized,
+                                        is_directed_graph,
+                                        do_expensive_check);
   }
 }
 
