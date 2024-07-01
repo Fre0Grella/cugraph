@@ -45,8 +45,26 @@ rmm::device_uvector<weight_t> closeness_centrality(
   bool const do_expensive_check)
 {
 {
-    
-    return 0;
-};
+  if (vertices) {
+    return detail::betweenness_centrality(handle,
+                                          graph_view,
+                                          edge_weight_view,
+                                          vertices->begin(),
+                                          vertices->end(),
+                                          normalized,
+                                          include_endpoints,
+                                          do_expensive_check);
+  } else {
+    return detail::betweenness_centrality(
+      handle,
+      graph_view,
+      edge_weight_view,
+      thrust::make_counting_iterator(graph_view.local_vertex_partition_range_first()),
+      thrust::make_counting_iterator(graph_view.local_vertex_partition_range_last()),
+      normalized,
+      include_endpoints,
+      do_expensive_check);
+  }
+}
 
 } // end namesapce cugraph
