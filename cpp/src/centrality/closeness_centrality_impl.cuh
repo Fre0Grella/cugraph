@@ -34,8 +34,16 @@ namespace cugraph {
 namespace detail {
 } // end namespace detail
 
-/*rmm::device_uvector<weight_t>*/template <typename eh_volevi>
-eh_volevi closeness_centrality()
+template <typename vertex_t, typename edge_t, typename weight_t, bool multi_gpu>
+rmm::device_uvector<weight_t> closeness_centrality(
+  const raft::handle_t& handle,
+  graph_view_t<vertex_t, edge_t, false, multi_gpu> const& graph_view,
+  std::optional<edge_property_view_t<edge_t, weight_t const*>> edge_weight_view,
+  std::optional<raft::device_span<vertex_t const>> vertices,
+  bool const normalized,
+  bool const is_directed_graph,
+  bool const do_expensive_check)
+{
 {
     
     return 0;
