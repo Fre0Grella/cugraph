@@ -26,7 +26,7 @@ template rmm::device_uvector<float> closeness_centrality(
   std::optional<edge_property_view_t<int32_t, float const*>> edge_weight_view,
   std::optional<raft::device_span<int32_t const>> vertices,
   bool const normalized,
-  bool const is_directed_graph,
+  bool const include_self_loop,
   bool do_expensive_check);
 
 template rmm::device_uvector<double> closeness_centrality(
@@ -35,7 +35,7 @@ template rmm::device_uvector<double> closeness_centrality(
   std::optional<edge_property_view_t<int32_t, double const*>> edge_weight_view,
   std::optional<raft::device_span<int32_t const>> vertices,
   bool const normalized,
-  bool const is_directed_graph,
+  bool const include_self_loop,
   bool do_expensive_check);
 
 }

@@ -44,7 +44,7 @@ rmm::device_uvector<weight_t> closeness_centrality(
   VertexIterator vertices_begin,
   VertexIterator vertices_end,
   bool const normalized,
-  bool const is_directed_graph,
+  bool const include_self_loop,
   bool const do_expensive_check)
   {
     //
@@ -70,38 +70,29 @@ rmm::device_uvector<weight_t> closeness_centrality(
     }
   
   //Allocate centralities weights and number of vertices
-  rmm::device_uvector<weight_t> centralities(graph_view.local_vertex_partition_range_size(),
+  rmm::device_uvector<weight_t> centralities(graph_view.number_of_vertices(),
                                              handle.get_stream());
-  size_t num_sources = thrust::distance(vertices_begin, vertices_end);
+  size_t vertex_num = thrust::distance(vertices_begin, vertices_end);
 
-  //TODO: add the core part
+  //TODO: to implement
+  centralities = floyd_warshall();
   
-  
-  std::optional<weight_t> scale_factor{std::nullopt};
   if (normalized) {
     weight_t n = static_cast<weight_t>(graph_view.number_of_vertices());
-    if (!is_directed_graph) { n -= weight_t{1}; }
-
-    scale_factor = n * (n - 1);
-  } else if (graph_view.is_symmetric())
-    scale_factor = weight_t{2};
-
-  if (scale_factor) {
-    if (graph_view.number_of_vertices() > 2) {
-      if (static_cast<vertex_t>(num_sources) < graph_view.number_of_vertices()) {
-        (*scale_factor) *= static_cast<weight_t>(num_sources) /
-                           static_cast<weight_t>(graph_view.number_of_vertices());
-      }
-
-      thrust::transform(
-        handle.get_thrust_policy(),
-        centralities.begin(),
-        centralities.end(),
-        centralities.begin(),
-        [sf = *scale_factor] __device__(auto centrality) { return centrality / sf; });
-    }
+    if (!include_self_loop)
+      n = n - 1;
+    
+    rmm::device_uvector<weight_t> temp(centralities.size(), handle.get_stream());
+    thrust::fill(temp.begin(), temp.end(), n);
+    thrust::transform(
+      handle.get_thrust_policy(),
+      temp.begin(),
+      temp.end(),
+      centralities.begin(),
+      centralities.begin(),
+      thrust::multiplies<weight_t>()
+    );
   }
-
   return centralities;
   }
   
@@ -114,7 +105,7 @@ rmm::device_uvector<weight_t> closeness_centrality(
   std::optional<edge_property_view_t<edge_t, weight_t const*>> edge_weight_view,
   std::optional<raft::device_span<vertex_t const>> vertices,
   bool const normalized,
-  bool const is_directed_graph,
+  bool const include_self_loop,
   bool const do_expensive_check)
 {
   if constexpr (multi_gpu) {
@@ -128,7 +119,7 @@ rmm::device_uvector<weight_t> closeness_centrality(
                                           vertices->begin(),
                                           vertices->end(),
                                           normalized,
-                                          is_directed_graph,
+                                          include_self_loop,
                                           do_expensive_check);
   } else {
     return detail::closeness_centrality(
@@ -138,7 +129,7 @@ rmm::device_uvector<weight_t> closeness_centrality(
                                         thrust::make_counting_iterator(graph_view.local_vertex_partition_range_first()),
                                         thrust::make_counting_iterator(graph_view.local_vertex_partition_range_last()),
                                         normalized,
-                                        is_directed_graph,
+                                        include_self_loop,
                                         do_expensive_check);
   }
 }
