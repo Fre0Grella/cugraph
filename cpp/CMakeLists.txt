@@ -475,7 +475,9 @@ set(CUGRAPH_SOURCES
     src/centrality/betweenness_centrality_mg_v64_e64.cu
     src/centrality/betweenness_centrality_mg_v32_e32.cu
     src/centrality/betweenness_centrality_mg_v32_e64.cu
-    src/centrality/closeness_centrality_sg.cu
+    src/centrality/closeness_centrality_sg_v32_e32.cu
+    src/centrality/closeness_centrality_sg_v32_e64.cu
+    src/centrality/closeness_centrality_sg_v64_e64.cu
     src/tree/legacy/mst.cu
     src/components/weakly_connected_components_sg_v64_e64.cu
     src/components/weakly_connected_components_sg_v32_e32.cu
